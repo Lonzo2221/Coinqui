@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Faccende di casa</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="testata">
+      <h1 id="titolo">Oggi</h1>
+      <p id="sottotitolo"></p>
+    </header>
+    <main id="contenuto"></main>
+    <nav class="nav">
+      <a href="#oggi" data-tab="oggi"><span aria-hidden="true">✓</span>Oggi</a>
+      <a href="#calendario" data-tab="calendario"><span aria-hidden="true">▦</span>Calendario</a>
+      <a href="#coinquilini" data-tab="coinquilini"><span aria-hidden="true">☺</span>Coinquilini</a>
+      <a href="#gestione" data-tab="gestione"><span aria-hidden="true">⚙</span>Gestione</a>
+    </nav>
+  </div>
+  <dialog id="dialogo"></dialog>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

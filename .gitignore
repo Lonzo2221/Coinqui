@@ -1,0 +1,24 @@
+# --- Dipendenze di Node ---
+# Si ricreano con "npm install": sono migliaia di file e non vanno versionati.
+node_modules/
+
+# --- Segreti e configurazioni locali ---
+# Password, chiavi API, credenziali del database: non devono MAI finire su git.
+.env
+.env.*
+!.env.example
+
+# --- Log e file temporanei ---
+npm-debug.log*
+*.log
+*.tmp
+
+# --- File creati da Windows / macOS ---
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# --- Impostazioni personali di editor e strumenti ---
+.vscode/
+.idea/
+.claude/settings.local.json
