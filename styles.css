@@ -1,155 +1,271 @@
+/* Coinqui — aspetto "Salotto chiaro": avorio, verde oliva-salvia, ocra; caldo ma elegante. */
+
 :root {
-  --sfondo: #f4f2ee;
-  --carta: #ffffff;
-  --testo: #1f2328;
-  --tenue: #6a6f76;
-  --bordo: #e2ded6;
-  --primario: #2f6f5e;
-  --primario-tenue: #e3efe9;
-  --ritardo: #b4441f;
-  --ritardo-tenue: #fbe9e2;
-  --raggio: 14px;
+  --sfondo: #F7F1E7;
+  --sfondo-fondo: #F1E8DA;
+  --carta: #FFFCF7;
+  --testo: #2A231C;
+  --tenue: #857767;
+  --bordo: #EEE4D6;
+  --oliva: #6E7B55;
+  --oliva-scuro: #4E5A38;
+  --ocra: #C8963E;
+  --ocra-scuro: #95691F;
+  --ocra-chiaro: #EBCF95;
+  --crema-chiaro: #FFFAF1;
+  --ritardo: #B4532A;
+  --ritardo-tenue: #F8E3D8;
+  --ombra: 0 8px 20px -14px rgb(92 70 40 / .35);
+  --raggio: 18px;
+  --serif: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Noto Serif", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: #d9d6cf;
+  background: #E9E1D4;
   color: var(--testo);
-  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 15px/1.4 var(--sans);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .app {
   max-width: 440px;
   min-height: 100vh;
   margin: 0 auto;
-  background: var(--sfondo);
-  padding-bottom: 80px;
+  background: linear-gradient(180deg, var(--sfondo) 0%, var(--sfondo-fondo) 100%);
+  padding-bottom: calc(100px + env(safe-area-inset-bottom));
 }
 
-.testata { padding: 20px 16px 8px; }
-.testata h1 { margin: 0; font-size: 26px; }
-.testata p { margin: 2px 0 0; color: var(--tenue); }
+/* ---------- Testata ---------- */
 
-main { padding: 0 16px 16px; }
+.testata {
+  padding: calc(22px + env(safe-area-inset-top)) 22px 26px;
+  border-radius: 0 0 26px 26px;
+  color: var(--oliva-scuro);
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgb(200 150 62 / .22), transparent 55%),
+    linear-gradient(160deg, #EFE9D8 0%, #E3DCC6 100%);
+  box-shadow: 0 10px 24px -18px rgb(78 90 56 / .6);
+}
+.testata h1 { margin: 0; font: 400 36px/1.08 var(--serif); }
+.testata p { margin: 4px 0 0; font: italic 16px var(--serif); color: var(--ocra-scuro); }
+
+main { padding: 2px 16px 16px; }
+
+/* ---------- Titoli di sezione ---------- */
 
 h2 {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--tenue);
-  margin: 22px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: italic 400 18px var(--serif);
+  color: var(--oliva-scuro);
+  margin: 20px 4px 8px;
+}
+h2::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--ocra), transparent);
+  opacity: .7;
 }
 
-.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+/* ---------- Liste: righe raggruppate in un'unica scheda ---------- */
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--carta);
+  border-radius: var(--raggio);
+  box-shadow: var(--ombra), inset 0 1px 0 rgb(255 255 255 / .8);
+  overflow: hidden;
+}
+.lista > li + li { border-top: 1px solid var(--bordo); }
 
 .card {
+  position: relative;
   background: var(--carta);
-  border: 1px solid var(--bordo);
-  border-radius: var(--raggio);
-  padding: 12px 14px;
+  padding: 12px 14px 12px 16px;
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.card .info { flex: 1; min-width: 0; display: grid; gap: 2px; }
-.card .meta { color: var(--tenue); font-size: 14px; }
-.card.fatta strong { color: var(--tenue); text-decoration: line-through; }
-.card.ritardo { border-color: #efc2b2; }
+/* striscia di stato a sinistra */
+.card::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 10px; bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: transparent;
+}
+.card.ritardo::before { background: var(--ritardo); }
+.card.fatta::before { background: var(--oliva); }
+
+.card .info { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.card strong { font: 600 15.5px/1.3 var(--serif); }
+.card .meta { color: var(--tenue); font-size: 13.5px; }
+.card.fatta strong { color: var(--tenue); }
 a.card { color: inherit; text-decoration: none; }
+a.card .freccia { color: var(--ocra); font: 22px var(--serif); }
+
+/* iniziali dei coinquilini */
+.av {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font: 600 14px var(--serif);
+  color: #FFF7EA;
+  background: var(--oliva);
+  box-shadow: 0 0 0 2px var(--carta), 0 0 0 3px var(--ocra);
+}
+.av-0 { background: #B4532A; }
+.av-1 { background: #6E7B55; }
+.av-2 { background: #9A7B53; }
+.av-3 { background: #B8873A; }
+.av-4 { background: #84605C; }
+.av-libera { background: #F0E9DC; color: var(--oliva); }
+.av svg { width: 17px; height: 17px; }
 
 .badge {
   justify-self: start;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ritardo);
   background: var(--ritardo-tenue);
   border-radius: 999px;
   padding: 1px 8px;
+  margin-top: 3px;
 }
-.esito { font-size: 14px; color: var(--primario); }
-.vuoto { color: var(--tenue); margin: 4px 2px; }
+.esito { font-size: 13.5px; color: var(--oliva); }
+.vuoto { color: var(--tenue); margin: 4px 4px; font: italic 15px var(--serif); }
+
+/* ---------- Pulsanti ---------- */
 
 .btn {
   font: inherit;
+  font-size: 14.5px;
   font-weight: 600;
   border: 0;
-  border-radius: 10px;
-  padding: 9px 14px;
-  background: var(--primario);
-  color: #fff;
+  border-radius: 11px;
+  padding: 8px 14px;
+  background: var(--oliva-scuro);
+  color: var(--crema-chiaro);
+  box-shadow: 0 5px 12px -8px rgb(63 74 43 / .9);
   cursor: pointer;
   white-space: nowrap;
 }
-.btn.secondario { background: var(--primario-tenue); color: var(--primario); }
-.btn.pericolo { background: var(--ritardo-tenue); color: var(--ritardo); }
-.btn.piccolo { padding: 6px 10px; font-size: 14px; }
-.btn.largo { width: 100%; }
+.btn:active { transform: translateY(1px); }
+.btn.secondario {
+  background: transparent;
+  color: var(--ocra-scuro);
+  box-shadow: inset 0 0 0 1px #E3C88F;
+}
+.btn.pericolo { background: var(--ritardo-tenue); color: var(--ritardo); box-shadow: none; }
+.btn.nudo { background: none; box-shadow: none; color: var(--tenue); }
+.btn.piccolo { padding: 5px 11px; font-size: 13.5px; }
+.btn.largo { display: block; width: 100%; }
+a.btn { text-align: center; text-decoration: none; }
+main > .btn.largo:first-child { margin-top: 16px; }
 
-.giorno-cal { margin-top: 18px; }
-.giorno-cal h2 { margin-top: 0; }
-.giorno-cal.oggi h2 { color: var(--primario); }
+/* ---------- Calendario ---------- */
 
-form.modulo { display: grid; gap: 16px; margin-top: 8px; }
-label.campo { display: grid; gap: 6px; font-weight: 600; }
+.giorno-cal { margin-top: 4px; }
+.giorno-cal.oggi h2 { color: var(--ocra-scuro); }
+
+/* ---------- Moduli ---------- */
+
+form.modulo { display: grid; gap: 16px; margin-top: 16px; }
+label.campo { display: grid; gap: 6px; font: 600 15px var(--serif); }
 input[type=text], input[type=date], select {
-  font: inherit;
+  font: 15px var(--sans);
   padding: 10px 12px;
   border: 1px solid var(--bordo);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--carta);
   color: var(--testo);
   width: 100%;
 }
+input:focus, select:focus { outline: none; border-color: var(--ocra); box-shadow: 0 0 0 3px rgb(200 150 62 / .25); }
 fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
-legend { font-weight: 600; margin-bottom: 6px; }
+legend { font: 600 15px var(--serif); margin-bottom: 6px; }
 .scelte { display: flex; flex-wrap: wrap; gap: 6px; }
 .scelte label {
   border: 1px solid var(--bordo);
   background: var(--carta);
   border-radius: 999px;
   padding: 6px 12px;
+  font-size: 14px;
   cursor: pointer;
 }
-.scelte input { margin: 0 4px 0 0; }
+.scelte label:has(input:checked) { background: var(--oliva); border-color: var(--oliva); color: var(--crema-chiaro); }
+.scelte input { margin: 0 5px 0 0; accent-color: var(--ocra); }
 .errore { color: var(--ritardo); margin: 0; }
 .azioni { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .riga-nome { display: flex; gap: 8px; align-items: center; }
+.riga-nome input[type=text] { flex: 1; min-width: 0; }
+form.aggiungi { margin-top: 10px; }
+
+/* ---------- Dialogo "Chi l'ha fatta?" ---------- */
 
 dialog {
   border: 0;
-  border-radius: 18px;
+  border-radius: 20px;
   padding: 20px;
-  width: min(360px, calc(100% - 32px));
+  width: min(340px, calc(100% - 32px));
   background: var(--carta);
   color: var(--testo);
+  box-shadow: 0 18px 40px -18px rgb(92 62 30 / .6);
 }
-dialog::backdrop { background: rgb(0 0 0 / .35); }
-dialog h3 { margin: 0 0 4px; }
-dialog p { margin: 0 0 14px; color: var(--tenue); }
-.nomi { display: grid; gap: 8px; margin-bottom: 10px; }
+dialog::backdrop { background: rgb(42 33 27 / .45); }
+dialog h3 { margin: 0 0 2px; font: 400 23px var(--serif); }
+dialog p { margin: 0 0 14px; font: italic 15px var(--serif); color: var(--tenue); }
+.nomi { display: grid; gap: 8px; margin-bottom: 6px; }
+.nomi .btn { padding: 10px; }
+.nomi .btn.secondario { color: var(--testo); background: #fff; box-shadow: inset 0 0 0 1px var(--bordo); }
+
+/* ---------- Barra in basso (galleggiante) ---------- */
 
 .nav {
   position: fixed;
-  bottom: 0;
   left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  width: 100%;
-  max-width: 440px;
+  width: calc(100% - 28px);
+  max-width: 412px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  background: var(--carta);
-  border-top: 1px solid var(--bordo);
+  gap: 2px;
+  padding: 6px;
+  background: var(--oliva-scuro);
+  border-radius: 26px;
+  box-shadow: 0 14px 28px -12px rgb(38 46 28 / .7);
 }
 .nav a {
   display: grid;
   justify-items: center;
-  padding: 8px 0 12px;
-  font-size: 12px;
-  color: var(--tenue);
+  gap: 1px;
+  padding: 5px 0;
+  border-radius: 20px;
+  font-size: 10.5px;
+  color: rgb(255 250 241 / .7);
   text-decoration: none;
 }
-.nav a span { font-size: 20px; line-height: 1.2; }
-.nav a.attivo { color: var(--primario); font-weight: 600; }
+.nav svg { width: 22px; height: 22px; }
+.nav a.attivo { background: var(--ocra); color: var(--testo); font-weight: 700; }
+
+svg.ic {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

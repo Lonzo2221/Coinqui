@@ -46,6 +46,15 @@ const nomeDi = (dati, id) => dati.coinquilini.find(c => c.id === id)?.nome ?? '�
 const titoloDi = (dati, id) => dati.faccende.find(f => f.id === id)?.titolo ?? '—';
 const chi = (dati, f) => (f.assegnataA ? `Assegnata a ${esc(nomeDi(dati, f.assegnataA))}` : 'Libera, chiunque');
 
+// Solo aspetto: tondo con l'iniziale del coinquilino (o una casetta se la faccenda è libera).
+// Il colore dipende dalla posizione nell'elenco, così resta lo stesso per ciascuno.
+function avatar(dati, id) {
+  if (!id) return '<span class="av av-libera" aria-hidden="true"><svg class="ic"><use href="#i-casa"/></svg></span>';
+  const n = Math.max(0, dati.coinquilini.findIndex(c => c.id === id)) % 5;
+  const iniziale = [...nomeDi(dati, id).trim()][0]?.toUpperCase() ?? '?';
+  return `<span class="av av-${n}" aria-hidden="true">${esc(iniziale)}</span>`;
+}
+
 function imposta(titolo, sottotitolo, html) {
   document.getElementById('titolo').textContent = titolo;
   document.getElementById('sottotitolo').textContent = sottotitolo;
@@ -73,6 +82,7 @@ function vistaOggi(dati) {
   const daFareHtml = voci.length
     ? `<ul class="lista">${voci.map(v => `
         <li class="card ${v.ritardoDal ? 'ritardo' : ''}">
+          ${avatar(dati, v.faccenda.assegnataA)}
           <div class="info">
             <strong>${esc(v.faccenda.titolo)}</strong>
             <span class="meta">${chi(dati, v.faccenda)}</span>
@@ -85,6 +95,7 @@ function vistaOggi(dati) {
   const fatteHtml = fatteOggi.length
     ? `<h2>Fatte oggi</h2><ul class="lista">${fatteOggi.map(c => `
         <li class="card fatta">
+          ${avatar(dati, c.fattaDa)}
           <div class="info">
             <strong>${esc(titoloDi(dati, c.faccendaId))}</strong>
             <span class="esito">Fatta da ${esc(nomeDi(dati, c.fattaDa))} · ${dataOra(c.fattaIl)}</span>
@@ -107,6 +118,7 @@ function vistaCalendario(dati) {
       const c = dati.completamenti.find(x => x.faccendaId === f.id && x.dataPrevista === g);
       return `
         <li class="card ${c ? 'fatta' : ''}">
+          ${avatar(dati, c ? c.fattaDa : f.assegnataA)}
           <div class="info">
             <strong>${esc(f.titolo)}</strong>
             ${c ? `<span class="esito">Fatta da ${esc(nomeDi(dati, c.fattaDa))} · ${dataOra(c.fattaIl)}</span>`
@@ -131,10 +143,11 @@ function vistaCoinquilini(dati) {
     const fatte = dati.completamenti.filter(c => c.fattaDa === p.id).length;
     return `
       <li><a class="card" href="#persona/${p.id}">
+        ${avatar(dati, p.id)}
         <div class="info">
           <strong>${esc(p.nome)}</strong>
           <span class="meta">${assegnate} assegnate · ${fatte} fatte</span>
-        </div><span aria-hidden="true">›</span>
+        </div><span class="freccia" aria-hidden="true">›</span>
       </a></li>`;
   }).join('');
   imposta('Coinquilini', dataLunga(g),
@@ -185,26 +198,28 @@ function vistaPersona(dati, id) {
 function vistaGestione(dati) {
   const faccende = [...dati.attive].sort((a, b) => a.titolo.localeCompare(b.titolo)).map(f => `
     <li><a class="card" href="#faccenda/${f.id}">
+      ${avatar(dati, f.assegnataA)}
       <div class="info">
         <strong>${esc(f.titolo)}</strong>
         <span class="meta">${descriviProgrammazione(f.programmazione)}</span>
         <span class="meta">${chi(dati, f)}</span>
-      </div><span aria-hidden="true">›</span>
+      </div><span class="freccia" aria-hidden="true">›</span>
     </a></li>`).join('');
 
   const persone = dati.persone.map(p => `
     <li class="card riga-nome">
+      ${avatar(dati, p.id)}
       <input type="text" value="${esc(p.nome)}" data-rinomina="${p.id}" aria-label="Nome di ${esc(p.nome)}">
       <button class="btn pericolo piccolo" data-rimuovi="${p.id}">Rimuovi</button>
     </li>`).join('');
 
   imposta('Gestione', 'Faccende e coinquilini', `
-    <a class="btn largo" href="#faccenda/nuova" style="display:block;text-align:center;text-decoration:none;margin-top:8px">+ Nuova faccenda</a>
+    <a class="btn largo" href="#faccenda/nuova">+ Nuova faccenda</a>
     <h2>Faccende</h2>
     <ul class="lista">${faccende}</ul>
     <h2>Coinquilini</h2>
     <ul class="lista">${persone}</ul>
-    <form id="nuovo-coinquilino" class="riga-nome" style="margin-top:8px">
+    <form id="nuovo-coinquilino" class="riga-nome aggiungi">
       <input type="text" name="nome" placeholder="Nome del nuovo coinquilino" required>
       <button class="btn">Aggiungi</button>
     </form>`);
@@ -243,7 +258,7 @@ function vistaModulo(dati, id) {
       <p class="errore" id="errore" hidden></p>
       <div class="azioni">
         <button class="btn">Salva</button>
-        <a class="btn secondario" href="#gestione" style="text-decoration:none">Annulla</a>
+        <a class="btn secondario" href="#gestione">Annulla</a>
         ${nuova ? '' : `<button type="button" class="btn pericolo" data-elimina-faccenda="${f.id}">Elimina</button>`}
       </div>
     </form>`);
@@ -259,7 +274,7 @@ function scegliNome(dati, titolo, preferito) {
       <div class="nomi">${dati.persone.map(c => `
         <button class="btn ${c.id === preferito ? '' : 'secondario'}" value="${c.id}">${esc(c.nome)}</button>`).join('')}
       </div>
-      <button class="btn secondario largo" value="" style="background:none">Annulla</button>`;
+      <button class="btn nudo largo" value="">Annulla</button>`;
     dialogo.onclick = e => {
       const b = e.target.closest('button');
       if (!b) return;
