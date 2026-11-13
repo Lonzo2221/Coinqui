@@ -1,4 +1,5 @@
-// Regole delle faccende: in quali giorni cadono, cosa c'è da fare oggi, cosa è in ritardo.
+// Regole delle faccende (in quali giorni cadono, cosa c'è da fare oggi, cosa è in ritardo)
+// e della lista della spesa (cosa si vede e cosa va archiviato).
 // Funzioni pure: lavorano sulle righe che ricevono, senza leggere o salvare dati.
 // Le date sono stringhe locali "AAAA-MM-GG", confrontabili come testo.
 
@@ -6,6 +7,8 @@ export const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'gioved�
 export const GIORNI_BREVI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
 export const ORDINE_SETTIMANA = [1, 2, 3, 4, 5, 6, 0];
 const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+const MESI_LUNGHI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
+  'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
 
 const due = n => String(n).padStart(2, '0');
 
@@ -43,6 +46,28 @@ export function dataLunga(s) {
 export function dataOra(iso) {
   const d = new Date(iso);
   return `${dataBreve(dataLocale(d))} alle ${due(d.getHours())}:${due(d.getMinutes())}`;
+}
+
+// ---------- Mese del calendario ----------
+
+export function nomeMese(giorno) {
+  const d = daStringa(giorno);
+  return `${MESI_LUNGHI[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// Il primo giorno del mese che sta "passo" mesi prima (-1) o dopo (+1) quello del giorno dato.
+export function primoDelMese(giorno, passo = 0) {
+  const d = daStringa(giorno.slice(0, 8) + '01');
+  d.setMonth(d.getMonth() + passo);
+  return dataLocale(d);
+}
+
+// Le caselle del mese che contiene il giorno, a settimane da lunedì: null per i buchi iniziali.
+export function grigliaMese(giorno) {
+  const primo = primoDelMese(giorno);
+  const caselle = Array((daStringa(primo).getDay() + 6) % 7).fill(null);
+  for (let g = primo; g.slice(0, 7) === primo.slice(0, 7); g = aggiungiGiorni(g, 1)) caselle.push(g);
+  return caselle;
 }
 
 export function cadeIl(faccenda, giorno) {
@@ -96,4 +121,30 @@ export function daFare(faccenda, completamenti, giorno) {
     // La data che il completamento coprirà: oggi se tocca oggi, altrimenti l'ultima saltata.
     dataPrevista: toccaOggi ? giorno : saltate.at(-1),
   };
+}
+
+// ---------- Lista della spesa ----------
+// Ogni voce: { id, nome, aggiuntaIl (ISO), spuntataIl ("AAAA-MM-GG" o null), archiviata }.
+// Una voce spuntata resta visibile, barrata, solo nel giorno in cui è stata spuntata;
+// dal giorno dopo va archiviata (non cancellata).
+
+const normalizza = s => String(s).trim().replace(/\s+/g, ' ').toLocaleLowerCase('it');
+
+export function stessoNome(a, b) {
+  return normalizza(a) === normalizza(b);
+}
+
+// Le voci da mostrare nel giorno indicato, in due gruppi: da comprare e comprate quel giorno.
+export function listaSpesa(voci, giorno) {
+  const perAggiunta = (a, b) => a.aggiuntaIl.localeCompare(b.aggiuntaIl);
+  const visibili = voci.filter(v => !v.archiviata);
+  return {
+    daComprare: visibili.filter(v => !v.spuntataIl).sort(perAggiunta),
+    comprate: visibili.filter(v => v.spuntataIl === giorno).sort(perAggiunta),
+  };
+}
+
+// Le voci spuntate in un giorno precedente e non ancora archiviate.
+export function daArchiviare(voci, giorno) {
+  return voci.filter(v => !v.archiviata && v.spuntataIl && v.spuntataIl < giorno);
 }

@@ -2,9 +2,10 @@ import * as db from './storage.js';
 import {
   oggi, aggiungiGiorni, dataLocale, dataBreve, dataLunga, dataOra,
   cadeIl, daFare, descriviProgrammazione, prossimaData, GIORNI_BREVI, ORDINE_SETTIMANA,
+  listaSpesa, daArchiviare, stessoNome, nomeMese, primoDelMese, grigliaMese,
 } from './logica.js';
 
-const GIORNI_CALENDARIO = 28;
+const GIORNI_PROSSIMI = 7; // sotto la griglia del calendario: i prossimi giorni, da domani
 
 const contenuto = document.getElementById('contenuto');
 const dialogo = document.getElementById('dialogo');
@@ -16,7 +17,7 @@ function datiIniziali() {
   const faccenda = (titolo, giorni) => ({
     id: db.nuovoId(), titolo, assegnataA: null,
     programmazione: { tipo: 'settimanale', giorni },
-    inizio: dataLocale(), creataIl: adesso, archiviata: false,
+    inizio: dataLocale(), creataIl: adesso, archiviata: false, collegataSpesa: false,
   });
   return {
     coinquilini: ['Lorenzo', 'Marco', 'Giulia'].map(nome => ({ id: db.nuovoId(), nome, archiviato: false })),
@@ -29,14 +30,21 @@ function datiIniziali() {
       faccenda('Fare la lavatrice', [2]),
     ],
     completamenti: [],
+    spesa: [],
   };
 }
 
 async function carica() {
-  const [coinquilini, faccende, completamenti] = await Promise.all(
-    ['coinquilini', 'faccende', 'completamenti'].map(db.elenco));
+  const [coinquilini, faccende, completamenti, tutteSpesa] = await Promise.all(
+    ['coinquilini', 'faccende', 'completamenti', 'spesa'].map(db.elenco));
+
+  // Le cose comprate nei giorni precedenti si archiviano (restano nei dati, non si vedono più).
+  const vecchie = daArchiviare(tutteSpesa, oggi());
+  for (const v of vecchie) await db.aggiorna('spesa', v.id, { archiviata: true });
+  const spesa = tutteSpesa.map(v => (vecchie.includes(v) ? { ...v, archiviata: true } : v));
+
   return {
-    coinquilini, faccende, completamenti,
+    coinquilini, faccende, completamenti, spesa,
     persone: coinquilini.filter(c => !c.archiviato),
     attive: faccende.filter(f => !f.archiviata),
   };
@@ -65,6 +73,7 @@ function etichettaGiorno(g) {
   const oggiStr = oggi();
   if (g === oggiStr) return `Oggi · ${dataBreve(g)}`;
   if (g === aggiungiGiorni(oggiStr, 1)) return `Domani · ${dataBreve(g)}`;
+  if (g === aggiungiGiorni(oggiStr, -1)) return `Ieri · ${dataBreve(g)}`;
   return dataLunga(g);
 }
 
@@ -87,6 +96,7 @@ function vistaOggi(dati) {
             <strong>${esc(v.faccenda.titolo)}</strong>
             <span class="meta">${chi(dati, v.faccenda)}</span>
             ${v.ritardoDal ? `<span class="badge">In ritardo dal ${dataBreve(v.ritardoDal)}</span>` : ''}
+            ${v.faccenda.collegataSpesa ? '<a class="btn secondario piccolo apri-lista" href="#spesa">Apri la lista</a>' : ''}
           </div>
           <button class="btn" data-fatta="${v.faccenda.id}" data-data="${v.dataPrevista}" data-ritardo="${v.ritardoDal ?? ''}">Fatta</button>
         </li>`).join('')}</ul>`
@@ -107,33 +117,94 @@ function vistaOggi(dati) {
   imposta('Oggi', dataLunga(g), `<h2>Da fare</h2>${daFareHtml}${fatteHtml}`);
 }
 
-function vistaCalendario(dati) {
-  const inizio = oggi();
-  let html = '';
-  for (let i = 0; i < GIORNI_CALENDARIO; i++) {
-    const g = aggiungiGiorni(inizio, i);
-    const delGiorno = dati.attive.filter(f => cadeIl(f, g) && g >= f.inizio)
-      .sort((a, b) => a.titolo.localeCompare(b.titolo));
-    const voci = delGiorno.map(f => {
-      const c = dati.completamenti.find(x => x.faccendaId === f.id && x.dataPrevista === g);
-      return `
-        <li class="card ${c ? 'fatta' : ''}">
-          ${avatar(dati, c ? c.fattaDa : f.assegnataA)}
-          <div class="info">
-            <strong>${esc(f.titolo)}</strong>
-            ${c ? `<span class="esito">Fatta da ${esc(nomeDi(dati, c.fattaDa))} · ${dataOra(c.fattaIl)}</span>`
-                : `<span class="meta">${chi(dati, f)}</span>`}
-          </div>
-          ${c ? '' : `<button class="btn secondario piccolo" data-fatta="${f.id}" data-data="${g}" data-ritardo="">Fatta</button>`}
-        </li>`;
-    }).join('');
-    html += `
-      <section class="giorno-cal ${i === 0 ? 'oggi' : ''}" data-giorno="${g}">
+// Le faccende di un giorno, ognuna col suo completamento se c'è. Oltre a quelle in programma
+// ci sono quelle fatte quel giorno e poi archiviate o riprogrammate, così il passato non sparisce.
+function vociDelGiorno(dati, g) {
+  const fatte = dati.completamenti.filter(c => c.dataPrevista === g);
+  const ids = new Set([
+    ...dati.attive.filter(f => cadeIl(f, g) && g >= f.inizio).map(f => f.id),
+    ...fatte.map(c => c.faccendaId),
+  ]);
+  return [...ids].map(id => dati.faccende.find(f => f.id === id)).filter(Boolean)
+    .sort((a, b) => a.titolo.localeCompare(b.titolo))
+    .map(faccenda => ({ faccenda, fatta: fatte.find(c => c.faccendaId === faccenda.id) }));
+}
+
+// Il pallino sotto il numero: tutto fatto, qualcosa non fatto (nel passato), qualcosa da fare.
+function statoGiorno(voci, g) {
+  if (!voci.length) return '';
+  if (voci.every(v => v.fatta)) return 'fatto';
+  return g < oggi() ? 'saltato' : 'da-fare';
+}
+const DESCRIZIONE_STATO = { fatto: 'tutto fatto', saltato: 'qualcosa non fatto', 'da-fare': 'qualcosa da fare', '': 'niente in programma' };
+
+// Le schede di un giorno: nel passato "Fatta da…" o "Non fatta", da oggi in poi col tasto Fatta.
+function schedeGiorno(dati, g) {
+  const passato = g < oggi();
+  const schede = vociDelGiorno(dati, g).map(({ faccenda: f, fatta: c }) => {
+    let stato = `<span class="meta">${chi(dati, f)}</span>`;
+    if (c) stato = `<span class="esito">Fatta da ${esc(nomeDi(dati, c.fattaDa))} · ${dataOra(c.fattaIl)}</span>`;
+    else if (passato) stato = '<span class="meta non-fatta">Non fatta</span>';
+    return `
+      <li class="card ${c ? 'fatta' : passato ? 'saltata' : ''}">
+        ${avatar(dati, c ? c.fattaDa : f.assegnataA)}
+        <div class="info">
+          <strong>${esc(f.titolo)}</strong>
+          ${stato}
+        </div>
+        ${c || passato ? '' : `<button class="btn secondario piccolo" data-fatta="${f.id}" data-data="${g}" data-ritardo="">Fatta</button>`}
+      </li>`;
+  }).join('');
+  return schede ? `<ul class="lista">${schede}</ul>` : '<p class="vuoto">Niente in programma</p>';
+}
+
+// scelto: il giorno toccato nella griglia (dall'indirizzo, es. #calendario/2026-11-14); di base oggi.
+function vistaCalendario(dati, scelto) {
+  const oggiStr = oggi();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(scelto ?? '')) scelto = oggiStr;
+
+  // Le frecce portano al mese prima o dopo: su oggi se è il mese di oggi, altrimenti sul primo del mese.
+  const meseVicino = passo => {
+    const primo = primoDelMese(scelto, passo);
+    return primo.slice(0, 7) === oggiStr.slice(0, 7) ? oggiStr : primo;
+  };
+  const caselle = grigliaMese(scelto).map(g => {
+    if (!g) return '<span></span>';
+    const stato = statoGiorno(vociDelGiorno(dati, g), g);
+    return `
+      <button class="cella ${g === oggiStr ? 'oggi' : ''} ${g === scelto ? 'scelto' : ''}" data-scegli-giorno="${g}"
+        aria-pressed="${g === scelto}" aria-label="${dataLunga(g)}, ${DESCRIZIONE_STATO[stato]}">
+        <span class="num">${Number(g.slice(8))}</span>
+        <span class="pallino ${stato}" aria-hidden="true"></span>
+      </button>`;
+  }).join('');
+
+  let prossimi = '';
+  for (let i = 1; i <= GIORNI_PROSSIMI; i++) {
+    const g = aggiungiGiorni(oggiStr, i);
+    prossimi += `
+      <section class="giorno-cal" data-giorno="${g}">
         <h2>${etichettaGiorno(g)}</h2>
-        ${voci ? `<ul class="lista">${voci}</ul>` : '<p class="vuoto">Niente in programma</p>'}
+        ${schedeGiorno(dati, g)}
       </section>`;
   }
-  imposta('Calendario', `Prossime ${GIORNI_CALENDARIO / 7} settimane`, html);
+
+  imposta('Calendario', 'Tocca un giorno per vedere cosa c\'è', `
+    <section class="mese">
+      <div class="mese-testa">
+        <button class="freccia-mese" data-scegli-giorno="${meseVicino(-1)}" aria-label="Mese prima">‹</button>
+        <strong id="nome-mese">${nomeMese(scelto)}</strong>
+        <button class="freccia-mese" data-scegli-giorno="${meseVicino(1)}" aria-label="Mese dopo">›</button>
+      </div>
+      <div class="settimana" aria-hidden="true">${ORDINE_SETTIMANA.map(g => `<span>${GIORNI_BREVI[g]}</span>`).join('')}</div>
+      <div class="griglia">${caselle}</div>
+    </section>
+    <section id="giorno-scelto" class="giorno-cal ${scelto === oggiStr ? 'oggi' : ''} ${scelto < oggiStr ? 'passato' : ''}" data-giorno="${scelto}">
+      <h2>${etichettaGiorno(scelto)}</h2>
+      ${schedeGiorno(dati, scelto)}
+    </section>
+    <h2 class="titolo-prossimi">Prossimi giorni</h2>
+    <div id="prossimi">${prossimi}</div>`);
 }
 
 function vistaCoinquilini(dati) {
@@ -203,6 +274,7 @@ function vistaGestione(dati) {
         <strong>${esc(f.titolo)}</strong>
         <span class="meta">${descriviProgrammazione(f.programmazione)}</span>
         <span class="meta">${chi(dati, f)}</span>
+        ${f.collegataSpesa ? '<span class="meta">Collegata alla spesa</span>' : ''}
       </div><span class="freccia" aria-hidden="true">›</span>
     </a></li>`).join('');
 
@@ -242,6 +314,10 @@ function vistaModulo(dati, id) {
           ${dati.persone.map(c => `<option value="${c.id}" ${f?.assegnataA === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}
         </select>
       </label>
+      <label class="casella">
+        <input type="checkbox" name="collegataSpesa" ${f?.collegataSpesa ? 'checked' : ''}>
+        Collegata alla lista della spesa
+      </label>
       <fieldset>
         <legend>Quando</legend>
         <div class="scelte">
@@ -262,6 +338,43 @@ function vistaModulo(dati, id) {
         ${nuova ? '' : `<button type="button" class="btn pericolo" data-elimina-faccenda="${f.id}">Elimina</button>`}
       </div>
     </form>`);
+}
+
+function vistaSpesa(dati) {
+  const { daComprare, comprate } = listaSpesa(dati.spesa, oggi());
+  const riga = v => {
+    const comprata = Boolean(v.spuntataIl);
+    return `
+      <li class="card voce-spesa ${comprata ? 'fatta' : ''}">
+        <button class="spunta" data-spunta="${v.id}" aria-pressed="${comprata}"
+          aria-label="${comprata ? 'Togli la spunta' : 'Segna come comprato'}: ${esc(v.nome)}">
+          <svg class="ic" aria-hidden="true"><use href="#i-spunta"/></svg>
+        </button>
+        ${comprata
+          ? `<span class="nome-voce barrato">${esc(v.nome)}</span>`
+          : `<input type="text" class="nome-voce" value="${esc(v.nome)}" data-rinomina-voce="${v.id}"
+               enterkeyhint="done" autocomplete="off" aria-label="Nome: ${esc(v.nome)} (tocca per correggere)">`}
+      </li>`;
+  };
+  const elenco = (id, voci) => `<ul class="lista" id="${id}">${voci.map(riga).join('')}</ul>`;
+
+  let lista;
+  if (!daComprare.length && !comprate.length) {
+    lista = '<h2>Da comprare</h2><p class="vuoto">La lista è vuota. Aggiungi quello che manca.</p>';
+  } else {
+    lista = `<h2>Da comprare</h2>
+      ${daComprare.length ? elenco('da-comprare', daComprare) : '<p class="vuoto">Niente da comprare: tutto preso!</p>'}
+      ${comprate.length ? `<h2>Comprate oggi</h2>${elenco('comprate', comprate)}` : ''}`;
+  }
+
+  imposta('Spesa', 'Cosa manca in casa', `
+    <form id="nuova-voce" class="riga-nome aggiungi">
+      <input type="text" name="nome" placeholder="Cosa manca? Es. latte" required
+        enterkeyhint="done" autocomplete="off" aria-label="Cosa manca">
+      <button class="btn">Aggiungi</button>
+    </form>
+    <p class="errore" id="errore-spesa" hidden></p>
+    ${lista}`);
 }
 
 // ---------- Azioni ----------
@@ -297,6 +410,13 @@ function confermato(bottone) {
 contenuto.addEventListener('click', async e => {
   const b = e.target.closest('button');
   if (!b) return;
+  // Calendario: toccare un giorno (o una freccia) cambia solo il giorno scelto.
+  // replaceState non aggiunge passi alla cronologia, così "indietro" non ripercorre ogni tocco.
+  if (b.dataset.scegliGiorno) {
+    history.replaceState(null, '', `#calendario/${b.dataset.scegliGiorno}`);
+    return mostra({ inCima: false });
+  }
+
   const dati = await carica();
 
   if (b.dataset.fatta) {
@@ -310,6 +430,11 @@ contenuto.addEventListener('click', async e => {
       fattaDa: persona,
       fattaIl: new Date().toISOString(),
     });
+  } else if (b.dataset.spunta) {
+    // Spuntare (o rispuntare) salva il giorno di oggi: conta sempre l'ultima volta.
+    const v = dati.spesa.find(x => x.id === b.dataset.spunta);
+    await db.aggiorna('spesa', v.id, { spuntataIl: v.spuntataIl ? null : oggi() });
+    return mostra({ inCima: false });
   } else if (b.dataset.annulla) {
     await db.elimina('completamenti', b.dataset.annulla);
   } else if (b.dataset.rimuovi) {
@@ -326,7 +451,8 @@ contenuto.addEventListener('click', async e => {
   } else {
     return;
   }
-  mostra();
+  // Nel calendario, dopo "Fatta" si resta allo stesso punto invece di saltare.
+  mostra({ inCima: !location.hash.startsWith('#calendario') });
 });
 
 contenuto.addEventListener('change', async e => {
@@ -334,16 +460,53 @@ contenuto.addEventListener('change', async e => {
   if (t.dataset.rinomina && t.value.trim()) {
     await db.aggiorna('coinquilini', t.dataset.rinomina, { nome: t.value.trim() });
   }
+  if (t.dataset.rinominaVoce) {
+    const nome = t.value.trim().replace(/\s+/g, ' ');
+    if (nome) {
+      await db.aggiorna('spesa', t.dataset.rinominaVoce, { nome });
+      t.value = t.defaultValue = nome;
+    } else {
+      t.value = t.defaultValue; // lasciato vuoto: torna il nome di prima
+    }
+  }
   if (t.name === 'tipo') {
     document.getElementById('scelta-giorni').hidden = t.value !== 'settimanale';
     document.getElementById('scelta-data').hidden = t.value !== 'una_volta';
   }
 });
 
+// Nella lista della spesa, "Invio" sulla tastiera chiude la correzione del nome.
+contenuto.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.dataset.rinominaVoce) e.target.blur();
+});
+
+contenuto.addEventListener('input', e => {
+  if (e.target.closest('#nuova-voce')) document.getElementById('errore-spesa').hidden = true;
+});
+
 contenuto.addEventListener('submit', async e => {
   e.preventDefault();
   const form = e.target;
   const v = new FormData(form);
+
+  if (form.id === 'nuova-voce') {
+    const nome = v.get('nome').trim().replace(/\s+/g, ' ');
+    const campo = form.elements.nome;
+    if (!nome) return;
+    const dati = await carica();
+    const { daComprare, comprate } = listaSpesa(dati.spesa, oggi());
+    if ([...daComprare, ...comprate].some(x => stessoNome(x.nome, nome))) {
+      const errore = document.getElementById('errore-spesa');
+      errore.textContent = 'Già presente';
+      errore.hidden = false;
+      campo.select();
+      return;
+    }
+    await db.inserisci('spesa', { nome, aggiuntaIl: new Date().toISOString(), spuntataIl: null, archiviata: false });
+    await mostra({ inCima: false });
+    document.querySelector('#nuova-voce input')?.focus(); // sul telefono la tastiera resta aperta
+    return;
+  }
 
   if (form.id === 'nuovo-coinquilino') {
     await db.inserisci('coinquilini', { nome: v.get('nome').trim(), archiviato: false });
@@ -366,7 +529,10 @@ contenuto.addEventListener('submit', async e => {
       errore.hidden = false;
       return;
     }
-    const campi = { titolo: v.get('titolo').trim(), assegnataA: v.get('assegnataA') || null, programmazione };
+    const campi = {
+      titolo: v.get('titolo').trim(), assegnataA: v.get('assegnataA') || null, programmazione,
+      collegataSpesa: v.get('collegataSpesa') === 'on',
+    };
     const id = form.dataset.id;
     if (id) {
       const vecchia = (await db.elenco('faccende')).find(f => f.id === id);
@@ -382,17 +548,18 @@ contenuto.addEventListener('submit', async e => {
 
 // ---------- Avvio ----------
 
-async function mostra() {
+// inCima: false quando si aggiorna la stessa pagina (es. spuntare nella spesa) senza farla saltare in alto.
+async function mostra({ inCima = true } = {}) {
   const [rotta, param] = (location.hash.slice(1) || 'oggi').split('/');
   const dati = await carica();
   const tab = { persona: 'coinquilini', faccenda: 'gestione' }[rotta] ?? rotta;
   document.querySelectorAll('.nav a').forEach(a => a.classList.toggle('attivo', a.dataset.tab === tab));
   const viste = {
-    oggi: vistaOggi, calendario: vistaCalendario, coinquilini: vistaCoinquilini,
+    oggi: vistaOggi, spesa: vistaSpesa, calendario: vistaCalendario, coinquilini: vistaCoinquilini,
     persona: vistaPersona, gestione: vistaGestione, faccenda: vistaModulo,
   };
   (viste[rotta] ?? vistaOggi)(dati, param);
-  window.scrollTo(0, 0);
+  if (inCima) window.scrollTo(0, 0);
 }
 
 window.addEventListener('hashchange', mostra);

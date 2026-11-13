@@ -1,5 +1,5 @@
 // Unico punto di accesso ai dati dell'app.
-// Ogni "tabella" (coinquilini, faccende, completamenti) è un elenco di righe con un id,
+// Ogni "tabella" (coinquilini, faccende, completamenti, spesa) è un elenco di righe con un id,
 // come in un database. Oggi le righe stanno nel localStorage del dispositivo; per passare
 // a un database online basta riscrivere queste funzioni con chiamate al server,
 // mantenendo gli stessi nomi e gli stessi risultati (sono già asincrone).
@@ -38,6 +38,14 @@ export async function aggiorna(tabella, id, campi) {
 
 export async function elimina(tabella, id) {
   scrivi(tabella, leggi(tabella).filter(r => r.id !== id));
+}
+
+// Solo per le prove automatiche (prove/): toglie tutti i dati dell'app, così ogni caso parte da zero.
+// L'app non la usa mai.
+export async function svuotaTutto() {
+  for (const chiave of Object.keys(localStorage)) {
+    if (chiave.startsWith(PREFISSO)) localStorage.removeItem(chiave);
+  }
 }
 
 // Al primo avvio carica i dati di partenza; poi non li tocca più.
