@@ -50,7 +50,11 @@ body {
     linear-gradient(160deg, #EFE9D8 0%, #E3DCC6 100%);
   box-shadow: 0 10px 24px -18px rgb(78 90 56 / .6);
 }
-.testata h1 { margin: 0; font: 400 36px/1.08 var(--serif); }
+.testata h1 {
+  margin: 0;
+  font: italic 400 36px/1.08 var(--serif);
+  -webkit-text-stroke: .6px currentColor; /* un filo più spesso, senza arrivare al grassetto */
+}
 .testata p { margin: 4px 0 0; font: italic 16px var(--serif); color: var(--ocra-scuro); }
 
 main { padding: 2px 16px 16px; }
